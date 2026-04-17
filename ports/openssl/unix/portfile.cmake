@@ -60,6 +60,14 @@ elseif(VCPKG_TARGET_IS_LINUX)
     else()
         set(OPENSSL_ARCH linux-generic32)
     endif()
+elseif(VCPKG_TARGET_IS_IOS AND VCPKG_OSX_SYSROOT MATCHES "macosx")
+    # macOS Catalyst: uses macOS SDK with iOS API surface
+    if(VCPKG_TARGET_ARCHITECTURE MATCHES "arm64")
+        set(OPENSSL_ARCH darwin64-arm64)
+    else()
+        set(OPENSSL_ARCH darwin64-x86_64)
+    endif()
+    list(APPEND CONFIGURE_OPTIONS no-ui no-asm)
 elseif(VCPKG_TARGET_IS_IOS)
     if(VCPKG_TARGET_ARCHITECTURE MATCHES "arm64")
         set(OPENSSL_ARCH ios64-xcrun)
@@ -77,6 +85,10 @@ elseif(VCPKG_TARGET_IS_TVOS OR VCPKG_TARGET_IS_WATCHOS)
     # disable that makes linkage error (e.g. require stderr usage)
     list(APPEND CONFIGURE_OPTIONS no-ui no-asm)
 elseif(VCPKG_TARGET_IS_OSX)
+    # Universal builds don't support ASM
+    if(VCPKG_OSX_ARCHITECTURES MATCHES "arm64" AND VCPKG_OSX_ARCHITECTURES MATCHES "x86_64")
+        list(APPEND CONFIGURE_OPTIONS no-asm)
+    endif()
     if(VCPKG_TARGET_ARCHITECTURE MATCHES "arm64")
         set(OPENSSL_ARCH darwin64-arm64)
     else()
@@ -134,6 +146,17 @@ vcpkg_configure_make(
     OPTIONS_DEBUG
         --debug
 )
+if(VCPKG_TARGET_IS_IOS AND VCPKG_OSX_SYSROOT MATCHES "macosx")
+    set(_catalyst_target "-target ${VCPKG_TARGET_ARCHITECTURE}-apple-ios${VCPKG_OSX_DEPLOYMENT_TARGET}-macabi")
+    foreach(_build_type dbg rel)
+        set(_makefile "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-${_build_type}/Makefile")
+        if(EXISTS "${_makefile}")
+            file(READ "${_makefile}" _content)
+            string(REGEX REPLACE "--target=[^ \t]+" "${_catalyst_target}" _content "${_content}")
+            file(WRITE "${_makefile}" "${_content}")
+        endif()
+    endforeach()
+endif()
 vcpkg_install_make(
     ${MAKEFILE_OPTIONS}
     BUILD_TARGET build_sw
