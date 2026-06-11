@@ -1,7 +1,7 @@
 {
   "default": {
     "openssl": {
-      "baseline": "3.5.6",
+      "baseline": "3.5.7",
       "port-version": 0
     },
     "xmlsec": {
